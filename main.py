@@ -1,4 +1,4 @@
-from blockchain import blockexplorer
+import json, requests
 from datetime import datetime
 
 miner_hashrate_per_s = 14 * 1000 * 1000 * 1000 * 1000 # Antminer S9 does 14 TH/s
@@ -6,7 +6,6 @@ miner_hashrate_per_h = miner_hashrate_per_s * 60 * 60 # TH/hour, respectively
 
 miner_power_w_h = 1372       # watts/hour for Antminer S9
 electricity_price_kW = 0.048 # in USD, China, cheapest I've found
-
 
 def leading_bits(c: chr):
     'number of leading (0) bits in a hex char'
@@ -33,42 +32,27 @@ def complexity(hash: str):
             break
     return sum
 
-blk = blockexplorer.get_latest_block()
+url = 'https://blockchain.info/blocks/?format=json'
+print('downloading', url)
+json_data=requests.get(url).content
+data = json.loads(json_data)
 
-c = complexity(blk.hash)
-hashes = 2**c
+print("LB = number of leading bits; PRICE = estimated price to mine the block")
+print("hash                                                             LB     PRICE timestamp")
 
-print("leading bits the hash: ", c)
-print("number of hashes     : ", hashes)
+total = 0
+for blk in data['blocks']:
+    if blk['main_chain']:
+        c = complexity(blk['hash'])
+        hashes = 2**c
+        hours_of_work = hashes / miner_hashrate_per_h
+        electricity_kw = hours_of_work * miner_power_w_h / 1000
+        electricity_price = electricity_price_kW * electricity_kw
+        total += electricity_price
+        print(blk['hash'], c, '{:>9,.0f}'.format(electricity_price), datetime.fromtimestamp(blk['time']).ctime())
 
-hours_of_work = hashes / miner_hashrate_per_h
-print("hours of work:         ", '{:,.0f}'.format(hours_of_work))
-
-electricity_kw = hours_of_work * miner_power_w_h / 1000
-print("kWatts:                ", '{:,.0f}'.format(electricity_kw))
-
-electricity_price = electricity_price_kW * electricity_kw
-print("electricity bill, USD: ", '{:,.0f}'.format(electricity_price))
-
-
-
-print("------------ let's have a look at the last 24h: (hash, timestamp, electricity bill for the block)")
-
-blk = blockexplorer.get_block(blk.hash)
-latestTimestamp = datetime.fromtimestamp(blk.time)
-total_electricity_price = 0
-
-while (latestTimestamp - datetime.fromtimestamp(blk.time)).total_seconds() < 24 * 60 * 60:
-    c = complexity(blk.hash)
-    hashes = 2 ** c
-    hours_of_work = hashes / miner_hashrate_per_h
-    electricity_kw = hours_of_work * miner_power_w_h / 1000
-    electricity_price = electricity_price_kW * electricity_kw
-    print("%s, %s, %s" % (blk.hash, datetime.fromtimestamp(blk.time).ctime(),  '{:,.0f}'.format(electricity_price)))
-
-    total_electricity_price += electricity_price
-    blk = blockexplorer.get_block(blk.previous_block)
-
-print("total electricity bill for 24h, USD: ", '{:,.0f}'.format(total_electricity_price))
-
-
+print("electricity bill, USD: ", '{:,.0f}'.format(total))
+interval_span_days = (data['blocks'][0]['time'] - data['blocks'][-1]['time']) / 24 / 60 / 60
+print("time mining, days    : ", '{:,.4f}'.format(interval_span_days))
+per_day = total / interval_span_days
+print("est. per day, USD    : ", '{:,.0f}'.format(per_day))
