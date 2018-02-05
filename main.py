@@ -35,7 +35,7 @@ def complexity(hash: str):
 url = 'https://blockchain.info/blocks/?format=json'
 print('downloading', url)
 json_data=requests.get(url).content
-data = json.loads(json_data)
+data = json.loads(json_data.decode('utf-8'))
 
 print("LB = number of leading bits; PRICE = estimated price to mine the block")
 print("hash                                                             LB     PRICE timestamp")
