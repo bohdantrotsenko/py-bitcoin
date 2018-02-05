@@ -41,6 +41,8 @@ print("LB = number of leading bits; PRICE = estimated price to mine the block")
 print("hash                                                             LB     PRICE timestamp")
 
 total = 0
+min = -1
+count = 0
 for blk in data['blocks']:
     if blk['main_chain']:
         c = complexity(blk['hash'])
@@ -49,10 +51,19 @@ for blk in data['blocks']:
         electricity_kw = hours_of_work * miner_power_w_h / 1000
         electricity_price = electricity_price_kW * electricity_kw
         total += electricity_price
+        if (electricity_price < min) or (min < 0):
+            min = electricity_price
         print(blk['hash'], c, '{:>9,.0f}'.format(electricity_price), datetime.fromtimestamp(blk['time']).ctime())
+        count = count + 1
 
 print("electricity bill, USD: ", '{:,.0f}'.format(total))
 interval_span_days = (data['blocks'][0]['time'] - data['blocks'][-1]['time']) / 24 / 60 / 60
 print("time mining, days    : ", '{:,.4f}'.format(interval_span_days))
 per_day = total / interval_span_days
 print("est. per day, USD    : ", '{:,.0f}'.format(per_day))
+
+print("----- using (min price of block) * (number of blocks):")
+total2 = min * count
+print("electricity bill, USD: ", '{:,.0f}'.format(total2))
+per_day2 = total2 / interval_span_days
+print("est. per day, USD    : ", '{:,.0f}'.format(per_day2))
